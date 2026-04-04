@@ -1,0 +1,44 @@
+tasks:
+  # plan_task:
+  #   description: >
+  #     1. 读取`docs/requirements.md`文件.
+  #     2. 创建一个详细的需求文档.
+  #   expected_output: "包含完整开发计划的单个md文件."
+  #   agent: "planner" # 引用上面定义的 agent key
+
+  # backend_task:
+  #   description: >
+  #     Using the development plan, generate all necessary files for the Java Spring Boot backend.
+  #     Create the following files:
+  #     - `backend/pom.xml`: Include dependencies for Spring Web, Spring Data JPA, and MySQL Connector.
+  #     - `backend/src/main/resources/application.properties`: Configure the database connection for a service named 'mysql' on port 3306 with database 'notesdb', user 'root', and password 'root'. Set ddl-auto to 'update'.
+  #     - `backend/src/main/java/com/example/notes/Application.java`: The main Spring Boot application class.
+  #     - `backend/src/main/java/com/example/notes/Note.java`: The JPA Entity.
+  #     - `backend/src/main/java/com/example/notes/NoteRepository.java`: The Spring Data JPA repository.
+  #     - `backend/src/main/java/com/example/notes/NoteService.java`: The business logic service.
+  #     - `backend/src/main/java/com/example/notes/NoteController.java`: The REST controller with all required endpoints and appropriate CORS configuration to allow requests from the frontend.
+  #   expected_output: "Confirmation that all backend files have been successfully created using the write_file tool."
+  #   agent: "backend_dev"
+  #   context: ["plan_task"] # 引用其他 task key 作为依赖
+
+  frontend_task:
+    description: >
+     1. 严格根据requirements.md需求执行.
+     2. 使用react.
+     3. 生成所有必要的开发文件.
+     4. 需求中的可能功能都无需实现.
+     5. 前台代码文件放入frontend目录下.
+    expected_output: "确认已使用写入文件工具[write_file tool]成功创建所有前台文件"
+    agent: "frontend_dev"
+    # context: ["plan_task"]
+
+  # devops_task:
+  #   description: >
+  #     Create a `docker-compose.yml` file in the project root.
+  #     It should define three services:
+  #     1. `db`: A MySQL 8 service with the environment variables for the database 'notesdb', user 'root', and password 'root'.
+  #     2. `backend`: A service that builds from the `./backend` directory, depends on `db`, and maps port 8080.
+  #     3. `frontend`: A service that builds from the `./frontend` directory, depends on `backend`, and maps port 3000.
+  #   expected_output: "A complete and valid `docker-compose.yml` file written to the project root."
+  #   agent: "devops_engineer"
+  #   context: ["backend_task", "frontend_task"]
