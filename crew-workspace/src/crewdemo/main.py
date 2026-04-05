@@ -6,6 +6,10 @@ import yaml
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process
 
+# import chromadb
+
+# client = chromadb.Client()
+
 # from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from tools.custom_tool import FileReadTool
