@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>保险行业每日数据看板</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --card: #ffffff;
+      --text: #1f2937;
+      --muted: #6b7280;
+      --primary: #2563eb;
+      --danger: #dc2626;
+      --ok: #059669;
+      --border: #e5e7eb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .title h1 { margin: 0; font-size: 24px; }
+    .title p { margin: 6px 0 0; color: var(--muted); font-size: 14px; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 8px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    button.primary {
+      background: var(--primary);
+      color: #fff;
+      border-color: var(--primary);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 12px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .card h2 {
+      margin: 0 0 10px;
+      font-size: 16px;
+    }
+    .span-4 { grid-column: span 4; }
+    .span-6 { grid-column: span 6; }
+    .span-8 { grid-column: span 8; }
+    .span-12 { grid-column: span 12; }
+    @media (max-width: 900px) {
+      .span-4, .span-6, .span-8, .span-12 { grid-column: span 12; }
+    }
+    .metric {
+      display: flex;
+      justify-content: space-between;
+      border-bottom: 1px dashed var(--border);
+      padding: 6px 0;
+      font-size: 14px;
+    }
+    .metric:last-child { border-bottom: 0; }
+    .value-ok { color: var(--ok); font-weight: 600; }
+    .value-danger { color: var(--danger); font-weight: 600; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 6px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    th { color: var(--muted); font-weight: 600; }
+    .tag {
+      display: inline-block;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      margin-right: 6px;
+      margin-bottom: 6px;
+      background: #f9fafb;
+    }
+    .status {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .error { color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="title">
+        <h1>保险行业每日数据、资讯与信息茧房看板</h1>
+        <p id="dateLine">日期：--</p>
+      </div>
+      <div class="actions">
+        <button id="refreshBtn" class="primary">立即拉取</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card span-4">
+        <h2>行业关键指标</h2>
+        <div id="industryMetrics"></div>
+      </section>
+
+      <section class="card span-8">
+        <h2>信息茧房监测</h2>
+        <div id="cocoonSummary"></div>
+        <div style="margin-top:10px;">
+          <strong style="font-size:14px;">高频话题</strong>
+          <div id="topicTags" style="margin-top:8px;"></div>
+        </div>
+        <div style="margin-top:10px;">
+          <strong style="font-size:14px;">潜在盲区</strong>
+          <ul id="blindSpots" style="margin:8px 0 0 18px;"></ul>
+        </div>
+      </section>
+
+      <section class="card span-12">
+        <h2>当日行业资讯</h2>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 52%;">标题</th>
+              <th style="width: 14%;">来源</th>
+              <th style="width: 14%;">时间</th>
+              <th style="width: 20%;">标签</th>
+            </tr>
+          </thead>
+          <tbody id="newsTableBody"></tbody>
+        </table>
+      </section>
+    </div>
+
+    <div id="statusLine" class="status">状态：等待拉取数据</div>
+  </div>
+
+  <script>
+    const API_CONFIG = {
+      industry: '/api/insurance/industry/daily',
+      news: '/api/insurance/news/daily',
+      cocoon: '/api/insurance/cocoon/daily'
+    };
+
+    const REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+
+    const el = {
+      dateLine: document.getElementById('dateLine'),
+      industryMetrics: document.getElementById('industryMetrics'),
+      cocoonSummary: document.getElementById('cocoonSummary'),
+      topicTags: document.getElementById('topicTags'),
+      blindSpots: document.getElementById('blindSpots'),
+      newsTableBody: document.getElementById('newsTableBody'),
+      statusLine: document.getElementById('statusLine'),
+      refreshBtn: document.getElementById('refreshBtn')
+    };
+
+    function nowText() {
+      return new Date().toLocaleString('zh-CN', { hour12: false });
+    }
+
+    async function fetchJson(url) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      try {
+        const response = await fetch(url, { signal: controller.signal });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        return await response.json();
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    function fallbackData() {
+      return {
+        industry: {
+          premiumIncome: '1,235 亿元',
+          claimRatio: '62.4%',
+          newPolicies: '18.7 万单',
+          growthRate: '+3.2%'
+        },
+        cocoon: {
+          concentrationScore: 78,
+          diversityScore: 45,
+          hotTopics: ['新能源车险', '医疗险理赔', '养老金融', '监管新规'],
+          blindSpots: ['中小险企偿付能力变化', '县域市场产品结构', '低关注险种投诉趋势']
+        },
+        news: [
+          { title: '多家保险机构发布长期资金配置新动向', source: '行业周刊', time: '09:20', tags: ['投资', '资产配置'], url: '#' },
+          { title: '车险综合改革后续评估数据公布', source: '财经快报', time: '10:45', tags: ['车险', '监管'], url: '#' },
+          { title: '医疗险用户服务满意度调查出炉', source: '保险观察', time: '13:10', tags: ['医疗险', '用户体验'], url: '#' }
+        ]
+      };
+    }
+
+    function renderIndustry(industry) {
+      const list = [
+        ['保费收入', industry.premiumIncome],
+        ['赔付率', industry.claimRatio],
+        ['新增保单', industry.newPolicies],
+        ['同比增速', industry.growthRate]
+      ];
+      el.industryMetrics.innerHTML = list.map(([k, v]) => {
+        const cls = typeof v === 'string' && v.includes('-') ? 'value-danger' : 'value-ok';
+        return `<div class="metric"><span>${k}</span><span class="${cls}">${v ?? '-'}</span></div>`;
+      }).join('');
+    }
+
+    function renderCocoon(cocoon) {
+      const concentrationClass = cocoon.concentrationScore >= 70 ? 'value-danger' : 'value-ok';
+      el.cocoonSummary.innerHTML = `
+        <div class="metric"><span>信息集中度</span><span class="${concentrationClass}">${cocoon.concentrationScore ?? '-'} / 100</span></div>
+        <div class="metric"><span>信息多样性</span><span class="value-ok">${cocoon.diversityScore ?? '-'} / 100</span></div>
+      `;
+
+      el.topicTags.innerHTML = (cocoon.hotTopics || []).map(topic => `<span class="tag">${topic}</span>`).join('');
+      el.blindSpots.innerHTML = (cocoon.blindSpots || []).map(item => `<li>${item}</li>`).join('');
+    }
+
+    function renderNews(newsList) {
+      el.newsTableBody.innerHTML = (newsList || []).map(news => `
+        <tr>
+          <td><a href="${news.url || '#'}" target="_blank" rel="noopener noreferrer">${news.title || '-'}</a></td>
+          <td>${news.source || '-'}</td>
+          <td>${news.time || '-'}</td>
+          <td>${(news.tags || []).map(t => `<span class="tag">${t}</span>`).join('')}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function refreshData() {
+      el.statusLine.textContent = `状态：${nowText()} 拉取中...`;
+      try {
+        const [industry, news, cocoon] = await Promise.all([
+          fetchJson(API_CONFIG.industry),
+          fetchJson(API_CONFIG.news),
+          fetchJson(API_CONFIG.cocoon)
+        ]);
+
+        renderIndustry(industry);
+        renderNews(news);
+        renderCocoon(cocoon);
+        el.statusLine.classList.remove('error');
+        el.statusLine.textContent = `状态：${nowText()} 拉取成功`;
+      } catch (error) {
+        const mock = fallbackData();
+        renderIndustry(mock.industry);
+        renderNews(mock.news);
+        renderCocoon(mock.cocoon);
+        el.statusLine.innerHTML = `状态：${nowText()} 拉取失败，已展示示例数据（${error.message}）`;
+        el.statusLine.classList.add('error');
+      }
+    }
+
+    function boot() {
+      const today = new Date().toLocaleDateString('zh-CN');
+      el.dateLine.textContent = `日期：${today}（每日自动更新）`;
+      el.refreshBtn.addEventListener('click', refreshData);
+      refreshData();
+      setInterval(refreshData, REFRESH_INTERVAL_MS);
+    }
+
+    boot();
+  </script>
+</body>
+</html>
