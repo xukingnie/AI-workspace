@@ -1,5 +1,21 @@
-# Vue 3 + Vite
+# ZZGG Frontend
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+基于 Vue 3 + Vite + Vant 的示例前端，包含：
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+- 日历：使用 `Calendar` 选择账单日期
+- 账单表单：使用 `Field` 和 `Button` 提交账单
+- 倒计时：使用 `CountDown` 展示下一个账单截止时间
+- 预留后端联调：默认请求 `http://127.0.0.1:8000/api`
+
+## 启动
+
+```bash
+npm install
+npm run dev
+```
+
+如需修改后端地址，可创建 `.env.local`：
+
+```bash
+VITE_API_BASE=http://127.0.0.1:8000/api
+```
