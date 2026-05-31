@@ -5,8 +5,11 @@ import {
   createTransaction,
   updateTransaction,
   deleteTransaction,
+  getNoteSuggestions,
+  getAmountSuggestions,
+  getAmountByNote,
 } from '@/api/transaction'
-import type { Transaction } from '@/types'
+import type { AmountSuggestion, NoteSuggestion, Transaction } from '@/types'
 
 export const useTransactionStore = defineStore('transaction', () => {
   const transactions = ref<Transaction[]>([])
@@ -46,6 +49,36 @@ export const useTransactionStore = defineStore('transaction', () => {
     transactions.value = transactions.value.filter((t) => t.id !== id)
   }
 
+  async function fetchNoteSuggestions(params: {
+    category_id: number
+    type?: string
+    limit?: number
+    recent_days?: number
+  }) {
+    const res = await getNoteSuggestions(params)
+    return res.data as NoteSuggestion[]
+  }
+
+  async function fetchAmountSuggestions(params: {
+    category_id: number
+    type?: string
+    limit?: number
+    recent_days?: number
+  }) {
+    const res = await getAmountSuggestions(params)
+    return res.data as AmountSuggestion[]
+  }
+
+  async function fetchAmountByNote(params: {
+    category_id: number
+    note: string
+    type?: string
+    recent_days?: number
+  }) {
+    const res = await getAmountByNote(params)
+    return res.data as AmountSuggestion | null
+  }
+
   return {
     transactions,
     loading,
@@ -53,5 +86,8 @@ export const useTransactionStore = defineStore('transaction', () => {
     addTransaction,
     editTransaction,
     removeTransaction,
+    fetchNoteSuggestions,
+    fetchAmountSuggestions,
+    fetchAmountByNote,
   }
 })

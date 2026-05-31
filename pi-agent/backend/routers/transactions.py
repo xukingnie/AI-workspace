@@ -1,11 +1,18 @@
 """账单 CRUD 路由"""
 from datetime import date
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
 from models import Transaction
-from schemas import TransactionCreate, TransactionUpdate, TransactionOut
+from schemas import (
+    TransactionCreate,
+    TransactionUpdate,
+    TransactionOut,
+    NoteSuggestionOut,
+    AmountSuggestionOut,
+)
 
 router = APIRouter(prefix="/api/transactions", tags=["账单"])
 
@@ -58,6 +65,146 @@ def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
         .first()
     )
     return txn
+
+
+@router.get("/note-suggestions", response_model=list[NoteSuggestionOut])
+def list_note_suggestions(
+    category_id: int | None = Query(None, ge=1),
+    type: str | None = Query(None, pattern="^(income|expense)$"),
+    limit: int = Query(8, ge=1, le=20),
+    recent_days: int = Query(30, ge=1, le=3650),
+    db: Session = Depends(get_db),
+):
+    """按分类返回常用备注建议（最近优先，去重）"""
+    if not category_id:
+        return []
+
+    window_start = date.fromordinal(date.today().toordinal() - recent_days)
+
+    q = (
+        db.query(
+            func.trim(Transaction.note).label("note"),
+            func.count(Transaction.id).label("count"),
+            func.max(Transaction.created_at).label("last_used_at"),
+        )
+        .filter(Transaction.category_id == category_id)
+        .filter(Transaction.transaction_date >= window_start)
+        .filter(Transaction.note.isnot(None))
+        .filter(func.trim(Transaction.note) != "")
+    )
+
+    if type:
+        q = q.filter(Transaction.type == type)
+
+    rows = (
+        q.group_by(func.trim(Transaction.note))
+        .order_by(func.max(Transaction.created_at).desc(), func.count(Transaction.id).desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "note": row.note,
+            "count": int(row.count),
+            "last_used_at": row.last_used_at,
+        }
+        for row in rows
+        if row.last_used_at is not None
+    ]
+
+
+@router.get("/amount-suggestions", response_model=list[AmountSuggestionOut])
+def list_amount_suggestions(
+    category_id: int | None = Query(None, ge=1),
+    type: str | None = Query(None, pattern="^(income|expense)$"),
+    limit: int = Query(8, ge=1, le=20),
+    recent_days: int = Query(30, ge=1, le=3650),
+    db: Session = Depends(get_db),
+):
+    """按分类返回常用金额建议（最近优先，去重）"""
+    if not category_id:
+        return []
+
+    window_start = date.fromordinal(date.today().toordinal() - recent_days)
+
+    q = (
+        db.query(
+            Transaction.amount.label("amount"),
+            func.count(Transaction.id).label("count"),
+            func.max(Transaction.created_at).label("last_used_at"),
+        )
+        .filter(Transaction.category_id == category_id)
+        .filter(Transaction.transaction_date >= window_start)
+        .filter(Transaction.amount > 0)
+    )
+
+    if type:
+        q = q.filter(Transaction.type == type)
+
+    rows = (
+        q.group_by(Transaction.amount)
+        .order_by(func.max(Transaction.created_at).desc(), func.count(Transaction.id).desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "amount": row.amount,
+            "count": int(row.count),
+            "last_used_at": row.last_used_at,
+        }
+        for row in rows
+        if row.last_used_at is not None
+    ]
+
+
+@router.get("/amount-by-note", response_model=AmountSuggestionOut | None)
+def get_amount_by_note(
+    category_id: int = Query(..., ge=1),
+    note: str = Query(..., min_length=1, max_length=200),
+    type: str | None = Query(None, pattern="^(income|expense)$"),
+    recent_days: int = Query(90, ge=1, le=3650),
+    db: Session = Depends(get_db),
+):
+    """按分类+备注返回联动金额建议（最近优先）"""
+    normalized_note = note.strip()
+    if not normalized_note:
+        return None
+
+    window_start = date.fromordinal(date.today().toordinal() - recent_days)
+
+    row = (
+        db.query(
+            Transaction.amount.label("amount"),
+            func.count(Transaction.id).label("count"),
+            func.max(Transaction.created_at).label("last_used_at"),
+        )
+        .filter(Transaction.category_id == category_id)
+        .filter(Transaction.transaction_date >= window_start)
+        .filter(func.trim(Transaction.note) == normalized_note)
+        .filter(Transaction.amount > 0)
+        .filter(Transaction.note.isnot(None))
+    )
+
+    if type:
+        row = row.filter(Transaction.type == type)
+
+    row = (
+        row.group_by(Transaction.amount)
+        .order_by(func.max(Transaction.created_at).desc(), func.count(Transaction.id).desc())
+        .first()
+    )
+
+    if not row or row.last_used_at is None:
+        return None
+
+    return {
+        "amount": row.amount,
+        "count": int(row.count),
+        "last_used_at": row.last_used_at,
+    }
 
 
 @router.put("/{txn_id}", response_model=TransactionOut)

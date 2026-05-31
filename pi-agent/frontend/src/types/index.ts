@@ -19,6 +19,18 @@ export interface Transaction {
   category?: Category
 }
 
+export interface NoteSuggestion {
+  note: string
+  count: number
+  last_used_at: string
+}
+
+export interface AmountSuggestion {
+  amount: number | string
+  count: number
+  last_used_at: string
+}
+
 /** 月度总览 */
 export interface Overview {
   total_income: number

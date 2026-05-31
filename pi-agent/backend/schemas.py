@@ -60,6 +60,18 @@ class TransactionOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class NoteSuggestionOut(BaseModel):
+    note: str
+    count: int
+    last_used_at: datetime
+
+
+class AmountSuggestionOut(BaseModel):
+    amount: Decimal
+    count: int
+    last_used_at: datetime
+
+
 # ==================== 统计 ====================
 
 class OverviewOut(BaseModel):

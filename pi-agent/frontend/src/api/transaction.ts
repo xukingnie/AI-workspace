@@ -1,5 +1,5 @@
 import request from './request'
-import type { Transaction } from '@/types'
+import type { AmountSuggestion, NoteSuggestion, Transaction } from '@/types'
 
 export interface TransactionQuery {
   type?: string
@@ -12,6 +12,36 @@ export interface TransactionQuery {
 
 export const getTransactions = (params?: TransactionQuery) =>
   request.get<Transaction[]>('/transactions', { params })
+
+export interface NoteSuggestionQuery {
+  category_id: number
+  type?: string
+  limit?: number
+  recent_days?: number
+}
+
+export const getNoteSuggestions = (params: NoteSuggestionQuery) =>
+  request.get<NoteSuggestion[]>('/transactions/note-suggestions', { params })
+
+export interface AmountSuggestionQuery {
+  category_id: number
+  type?: string
+  limit?: number
+  recent_days?: number
+}
+
+export const getAmountSuggestions = (params: AmountSuggestionQuery) =>
+  request.get<AmountSuggestion[]>('/transactions/amount-suggestions', { params })
+
+export interface LinkedAmountQuery {
+  category_id: number
+  note: string
+  type?: string
+  recent_days?: number
+}
+
+export const getAmountByNote = (params: LinkedAmountQuery) =>
+  request.get<AmountSuggestion | null>('/transactions/amount-by-note', { params })
 
 export const createTransaction = (data: {
   amount: number

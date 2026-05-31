@@ -95,18 +95,7 @@
         </div>
       </div>
       <div class="add-category-btn">
-        <van-button
-          type="primary"
-          block
-          @click="
-            () => {
-              resetCategoryForm()
-              showAddCategory = true
-            }
-          "
-        >
-          新增分类
-        </van-button>
+        <van-button type="primary" block @click="addCategoryBtn"> 新增分类 </van-button>
       </div>
     </div>
 
@@ -250,6 +239,7 @@ function onToggleTab(key: NavTabKey, visible: boolean) {
   navStore.setTabVisible(key, visible)
 }
 
+// #region 导航配置拖拽相关
 function onDragStart(key: NavTabKey) {
   dragFromKey.value = key
 }
@@ -272,6 +262,8 @@ function onDragEnd() {
   dragFromKey.value = null
   dragOverKey.value = null
 }
+
+// #endregion
 
 function setPageScrollLocked(locked: boolean) {
   if (typeof document === 'undefined') return
@@ -348,6 +340,11 @@ function onTouchDragMove(event: TouchEvent) {
   if (!targetKey) return
   touchDragOverKey.value = targetKey
   dragOverKey.value = targetKey
+}
+
+function addCategoryBtn() {
+  resetCategoryForm()
+  showAddCategory.value = true
 }
 
 function onTouchDragEnd() {
