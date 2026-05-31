@@ -20,3 +20,11 @@ if not DATABASE_URL:
 	else:
 		SQLITE_PATH = os.getenv("SQLITE_PATH", "./accounting.db")
 		DATABASE_URL = f"sqlite:///{SQLITE_PATH}"
+
+
+# 鉴权配置
+APP_ENV = os.getenv("APP_ENV", "dev")
+SECRET_KEY = os.getenv("SECRET_KEY", "pi-agent-dev-secret-change-me")
+ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_DAYS = int(os.getenv("ACCESS_TOKEN_EXPIRE_DAYS", "30"))
+SMS_CODE_TTL_SECONDS = int(os.getenv("SMS_CODE_TTL_SECONDS", "300"))

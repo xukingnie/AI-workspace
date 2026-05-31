@@ -8,7 +8,8 @@ from sqlalchemy import func, case
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Transaction, Category
+from dependencies import get_current_user
+from models import Transaction, Category, User
 from schemas import OverviewOut, CategoryStatOut, DailyStatOut
 
 router = APIRouter(prefix="/api/statistics", tags=["统计"])
@@ -25,6 +26,7 @@ def get_overview(
     year: int = Query(..., description="年份"),
     month: int = Query(..., ge=1, le=12, description="月份"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取月度收支总览"""
     start_date, end_date = _month_range(year, month)
@@ -32,6 +34,7 @@ def get_overview(
     income = (
         db.query(func.coalesce(func.sum(Transaction.amount), 0))
         .filter(
+            Transaction.user_id == current_user.id,
             Transaction.type == "income",
             Transaction.transaction_date >= start_date,
             Transaction.transaction_date <= end_date,
@@ -41,6 +44,7 @@ def get_overview(
     expense = (
         db.query(func.coalesce(func.sum(Transaction.amount), 0))
         .filter(
+            Transaction.user_id == current_user.id,
             Transaction.type == "expense",
             Transaction.transaction_date >= start_date,
             Transaction.transaction_date <= end_date,
@@ -60,6 +64,7 @@ def get_by_category(
     month: int = Query(..., ge=1, le=12),
     type: str = Query(..., pattern="^(income|expense)$"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """按分类统计指定月份的收支"""
     start_date, end_date = _month_range(year, month)
@@ -73,6 +78,8 @@ def get_by_category(
         )
         .join(Transaction, Transaction.category_id == Category.id)
         .filter(
+            Category.user_id == current_user.id,
+            Transaction.user_id == current_user.id,
             Transaction.type == type,
             Transaction.transaction_date >= start_date,
             Transaction.transaction_date <= end_date,
@@ -106,6 +113,7 @@ def get_daily(
     year: int = Query(...),
     month: int = Query(..., ge=1, le=12),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """获取指定月份每日收支汇总（日历用）"""
     start_date, end_date = _month_range(year, month)
@@ -127,6 +135,7 @@ def get_daily(
             ).label("expense"),
         )
         .filter(
+            Transaction.user_id == current_user.id,
             Transaction.transaction_date >= start_date,
             Transaction.transaction_date <= end_date,
         )

@@ -18,6 +18,12 @@
         </van-nav-bar>
 
         <div class="drawer-content">
+          <h3 class="drawer-title">账号设置</h3>
+          <p class="drawer-desc">当前手机号：{{ userStore.phone || '未登录' }}</p>
+          <van-button block plain type="danger" class="drawer-save" @click="handleLogout">
+            退出登录
+          </van-button>
+
           <h3 class="drawer-title">工资设置</h3>
           <p class="drawer-desc">配置后会在发薪日自动补记一条收入账单。</p>
 
@@ -64,15 +70,17 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { showToast } from 'vant'
+import { showConfirmDialog, showToast } from 'vant'
 import { useRoute, useRouter } from 'vue-router'
 import { useNavigationStore } from '@/stores/navigation'
 import { usePayrollStore } from '@/stores/payroll'
+import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const navStore = useNavigationStore()
 const payrollStore = usePayrollStore()
+const userStore = useUserStore()
 const showDrawer = ref(false)
 const paydayText = ref('')
 const salaryAmountText = ref('')
@@ -126,6 +134,21 @@ function handleSavePayroll() {
   })
   syncForm()
   showToast('工资设置已保存')
+}
+
+async function handleLogout() {
+  try {
+    await showConfirmDialog({
+      title: '确认退出',
+      message: '退出后需要重新登录。',
+    })
+  } catch {
+    return
+  }
+
+  await userStore.logout()
+  showDrawer.value = false
+  router.replace({ name: 'login' })
 }
 
 onMounted(() => {

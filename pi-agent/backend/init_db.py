@@ -1,4 +1,6 @@
 """初始化数据库：建表 + 种子数据"""
+from sqlalchemy import inspect, text
+
 from database import engine, SessionLocal, Base
 from models import Category
 
@@ -22,22 +24,31 @@ DEFAULT_CATEGORIES = [
 ]
 
 
+def _ensure_legacy_columns():
+    """兼容旧库结构：补齐 users 表关联列。"""
+    inspector = inspect(engine)
+
+    if "users" not in inspector.get_table_names():
+        return
+
+    category_columns = {col["name"] for col in inspector.get_columns("categories")}
+    transaction_columns = {col["name"] for col in inspector.get_columns("transactions")}
+
+    with engine.begin() as conn:
+        if "user_id" not in category_columns:
+            conn.execute(text("ALTER TABLE categories ADD COLUMN user_id INTEGER"))
+        if "user_id" not in transaction_columns:
+            conn.execute(text("ALTER TABLE transactions ADD COLUMN user_id INTEGER"))
+
+
 def init_database():
-    """建表并插入默认分类"""
+    """建表并兼容旧库结构。"""
     Base.metadata.create_all(bind=engine)
+    _ensure_legacy_columns()
 
     db = SessionLocal()
     try:
-        # 如果分类表已有数据则跳过
-        if db.query(Category).count() > 0:
-            print("分类数据已存在，跳过种子数据插入")
-            return
-
-        for cat in DEFAULT_CATEGORIES:
-            db.add(Category(**cat))
-
-        db.commit()
-        print(f"已插入 {len(DEFAULT_CATEGORIES)} 条默认分类")
+        print(f"当前分类数量: {db.query(Category).count()}，等待用户首次登录后初始化专属分类")
     finally:
         db.close()
 

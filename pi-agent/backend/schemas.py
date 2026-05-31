@@ -92,3 +92,35 @@ class DailyStatOut(BaseModel):
     date: date
     income: Decimal
     expense: Decimal
+
+
+# ==================== 用户/鉴权 ====================
+
+class SendCodeIn(BaseModel):
+    phone: str = Field(..., pattern="^1[3-9]\\d{9}$")
+
+
+class SendCodeOut(BaseModel):
+    message: str
+    expire_seconds: int
+    debug_code: Optional[str] = None
+
+
+class LoginByCodeIn(BaseModel):
+    phone: str = Field(..., pattern="^1[3-9]\\d{9}$")
+    code: str = Field(..., min_length=4, max_length=8)
+
+
+class UserOut(BaseModel):
+    id: int
+    phone: str
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AuthTokenOut(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserOut

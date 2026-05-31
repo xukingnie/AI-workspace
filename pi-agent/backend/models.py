@@ -10,6 +10,9 @@ class Category(Base):
     __tablename__ = "categories"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, comment="所属用户ID"
+    )
     name: Mapped[str] = mapped_column(String(50), nullable=False, comment="分类名称")
     type: Mapped[str] = mapped_column(
         Enum("income", "expense", name="category_type"),
@@ -22,7 +25,27 @@ class Category(Base):
         DateTime, default=datetime.now, comment="创建时间"
     )
 
+    user = relationship("User", back_populates="categories")
     transactions = relationship("Transaction", back_populates="category")
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    phone: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, comment="手机号")
+    password_hash: Mapped[str | None] = mapped_column(
+        String(255), nullable=True, comment="密码哈希（预留）"
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, comment="创建时间"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.now, onupdate=datetime.now, comment="更新时间"
+    )
+
+    categories = relationship("Category", back_populates="user")
+    transactions = relationship("Transaction", back_populates="user")
 
 
 class Transaction(Base):
@@ -36,6 +59,9 @@ class Transaction(Base):
         Enum("income", "expense", name="transaction_type"),
         nullable=False,
         comment="收入/支出",
+    )
+    user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id"), nullable=True, comment="所属用户ID"
     )
     category_id: Mapped[int] = mapped_column(
         Integer, ForeignKey("categories.id"), nullable=False, comment="分类ID"
@@ -54,4 +80,5 @@ class Transaction(Base):
         comment="更新时间",
     )
 
+    user = relationship("User", back_populates="transactions")
     category = relationship("Category", back_populates="transactions")

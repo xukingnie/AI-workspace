@@ -6,35 +6,6 @@
       </template>
     </van-nav-bar>
 
-    <!-- 月度概览卡片 -->
-    <div class="overview-card">
-      <div class="month-selector">
-        <van-icon name="arrow-left" @click="prevMonth" />
-        <span class="month-text">{{ year }}年{{ month }}月</span>
-        <van-icon name="arrow" @click="nextMonth" />
-      </div>
-      <div class="overview-numbers">
-        <div class="num-item clickable" @click="goToStats('income')">
-          <span class="label">收入</span>
-          <span class="value income">
-            {{ formatMoney(statsStore.overview?.total_income) }}
-          </span>
-        </div>
-        <div class="num-item clickable" @click="goToStats('expense')">
-          <span class="label">支出</span>
-          <span class="value expense">
-            {{ formatMoney(statsStore.overview?.total_expense) }}
-          </span>
-        </div>
-        <div class="num-item clickable" @click="goToStats('balance')">
-          <span class="label">结余</span>
-          <span class="value" :class="balanceClass">
-            {{ formatMoney(statsStore.overview?.balance) }}
-          </span>
-        </div>
-      </div>
-    </div>
-
     <!-- 倒计时卡片 -->
     <div class="countdown-card">
       <div class="countdown-header">
@@ -98,8 +69,6 @@ const payrollStore = usePayrollStore()
 const router = useRouter()
 
 const now = dayjs()
-const year = ref(now.year())
-const month = ref(now.month() + 1)
 const selectedDate = ref(now.format('YYYY-MM-DD'))
 
 const calendarYear = ref(now.year())
@@ -148,38 +117,6 @@ async function loadCalendarData() {
   dailyMap.value = map
 }
 
-function prevMonth() {
-  year.value = calendarYear.value
-  month.value = calendarMonth.value
-  calendarPrevMonth()
-  statsStore.fetchOverview(year.value, month.value)
-}
-
-function nextMonth() {
-  year.value = calendarYear.value
-  month.value = calendarMonth.value
-  calendarNextMonth()
-  statsStore.fetchOverview(year.value, month.value)
-}
-
-function goToStats(type: 'income' | 'expense' | 'balance') {
-  router.push({
-    name: 'stats',
-    query: {
-      type,
-      year: String(year.value),
-      month: String(month.value),
-    },
-  })
-}
-
-const balanceClass = computed(() => {
-  const bal = statsStore.overview?.balance ?? 0
-  if (bal > 0) return 'positive'
-  if (bal < 0) return 'negative'
-  return ''
-})
-
 const payday = computed(() => payrollStore.payday)
 const salaryAmount = computed(() => payrollStore.salaryAmount)
 
@@ -225,7 +162,7 @@ function onDateSelect(date: Date) {
 
 async function loadData() {
   await ensureSalaryTransaction()
-  await Promise.all([statsStore.fetchOverview(year.value, month.value), loadCalendarData()])
+  await loadCalendarData()
 }
 
 async function ensureSalaryTransaction() {
@@ -291,68 +228,6 @@ onMounted(loadData)
   min-height: 100vh;
   background: #f7f8fa;
   padding-bottom: 60px;
-}
-
-.overview-card {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 16px;
-  margin: 12px;
-  border-radius: 12px;
-}
-
-.month-selector {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 12px;
-}
-
-.month-text {
-  font-size: 18px;
-  font-weight: bold;
-}
-
-.overview-numbers {
-  display: flex;
-  justify-content: space-around;
-}
-
-.num-item {
-  text-align: center;
-}
-
-.num-item.clickable {
-  cursor: pointer;
-}
-
-.num-item .label {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
-.num-item .value {
-  display: block;
-  font-size: 20px;
-  font-weight: bold;
-  margin-top: 4px;
-}
-
-.num-item .value.income {
-  color: #a8f0a8;
-}
-
-.num-item .value.expense {
-  color: #ffb3b3;
-}
-
-.num-item .value.positive {
-  color: #a8f0a8;
-}
-
-.num-item .value.negative {
-  color: #ffb3b3;
 }
 
 .countdown-card {

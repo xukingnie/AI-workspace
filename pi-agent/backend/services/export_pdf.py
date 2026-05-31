@@ -26,6 +26,7 @@ except Exception:
 
 def export_pdf(
     db: Session,
+    user_id: int,
     start_date: date | None = None,
     end_date: date | None = None,
 ) -> io.BytesIO:
@@ -58,7 +59,7 @@ def export_pdf(
     elements = []
 
     # 标题
-    title_text = "记账系统 - 账单明细"
+    title_text = "ZG记账系统 - 账单明细"
     if start_date and end_date:
         title_text += f"（{start_date} ~ {end_date}）"
     elif start_date:
@@ -69,7 +70,9 @@ def export_pdf(
     elements.append(Spacer(1, 5 * mm))
 
     # 查询数据
-    q = db.query(Transaction).options(joinedload(Transaction.category))
+    q = db.query(Transaction).options(joinedload(Transaction.category)).filter(
+        Transaction.user_id == user_id
+    )
     if start_date:
         q = q.filter(Transaction.transaction_date >= start_date)
     if end_date:

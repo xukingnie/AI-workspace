@@ -5,7 +5,8 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from database import get_db
-from models import Transaction
+from dependencies import get_current_user
+from models import Category, Transaction, User
 from schemas import (
     TransactionCreate,
     TransactionUpdate,
@@ -26,9 +27,12 @@ def list_transactions(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """查询账单列表，支持筛选和分页"""
-    q = db.query(Transaction).options(joinedload(Transaction.category))
+    q = db.query(Transaction).options(joinedload(Transaction.category)).filter(
+        Transaction.user_id == current_user.id
+    )
 
     if type:
         q = q.filter(Transaction.type == type)
@@ -52,9 +56,21 @@ def list_transactions(
 
 
 @router.post("", response_model=TransactionOut)
-def create_transaction(data: TransactionCreate, db: Session = Depends(get_db)):
+def create_transaction(
+    data: TransactionCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """新增账单"""
-    txn = Transaction(**data.model_dump())
+    category = (
+        db.query(Category)
+        .filter(Category.id == data.category_id, Category.user_id == current_user.id)
+        .first()
+    )
+    if not category:
+        raise HTTPException(status_code=400, detail="分类不存在或无权限")
+
+    txn = Transaction(user_id=current_user.id, **data.model_dump())
     db.add(txn)
     db.commit()
     # 重新查询加载关联的 category
@@ -74,6 +90,7 @@ def list_note_suggestions(
     limit: int = Query(8, ge=1, le=20),
     recent_days: int = Query(30, ge=1, le=3650),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """按分类返回常用备注建议（最近优先，去重）"""
     if not category_id:
@@ -88,6 +105,7 @@ def list_note_suggestions(
             func.max(Transaction.created_at).label("last_used_at"),
         )
         .filter(Transaction.category_id == category_id)
+        .filter(Transaction.user_id == current_user.id)
         .filter(Transaction.transaction_date >= window_start)
         .filter(Transaction.note.isnot(None))
         .filter(func.trim(Transaction.note) != "")
@@ -121,6 +139,7 @@ def list_amount_suggestions(
     limit: int = Query(8, ge=1, le=20),
     recent_days: int = Query(30, ge=1, le=3650),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """按分类返回常用金额建议（最近优先，去重）"""
     if not category_id:
@@ -135,6 +154,7 @@ def list_amount_suggestions(
             func.max(Transaction.created_at).label("last_used_at"),
         )
         .filter(Transaction.category_id == category_id)
+        .filter(Transaction.user_id == current_user.id)
         .filter(Transaction.transaction_date >= window_start)
         .filter(Transaction.amount > 0)
     )
@@ -167,6 +187,7 @@ def get_amount_by_note(
     type: str | None = Query(None, pattern="^(income|expense)$"),
     recent_days: int = Query(90, ge=1, le=3650),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ):
     """按分类+备注返回联动金额建议（最近优先）"""
     normalized_note = note.strip()
@@ -182,6 +203,7 @@ def get_amount_by_note(
             func.max(Transaction.created_at).label("last_used_at"),
         )
         .filter(Transaction.category_id == category_id)
+        .filter(Transaction.user_id == current_user.id)
         .filter(Transaction.transaction_date >= window_start)
         .filter(func.trim(Transaction.note) == normalized_note)
         .filter(Transaction.amount > 0)
@@ -208,12 +230,32 @@ def get_amount_by_note(
 
 
 @router.put("/{txn_id}", response_model=TransactionOut)
-def update_transaction(txn_id: int, data: TransactionUpdate, db: Session = Depends(get_db)):
+def update_transaction(
+    txn_id: int,
+    data: TransactionUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """编辑账单"""
-    txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
+    txn = (
+        db.query(Transaction)
+        .filter(Transaction.id == txn_id, Transaction.user_id == current_user.id)
+        .first()
+    )
     if not txn:
         raise HTTPException(status_code=404, detail="账单不存在")
-    for key, val in data.model_dump(exclude_unset=True).items():
+
+    payload = data.model_dump(exclude_unset=True)
+    if "category_id" in payload:
+        category = (
+            db.query(Category)
+            .filter(Category.id == payload["category_id"], Category.user_id == current_user.id)
+            .first()
+        )
+        if not category:
+            raise HTTPException(status_code=400, detail="分类不存在或无权限")
+
+    for key, val in payload.items():
         setattr(txn, key, val)
     db.commit()
     txn = (
@@ -226,9 +268,17 @@ def update_transaction(txn_id: int, data: TransactionUpdate, db: Session = Depen
 
 
 @router.delete("/{txn_id}")
-def delete_transaction(txn_id: int, db: Session = Depends(get_db)):
+def delete_transaction(
+    txn_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """删除账单"""
-    txn = db.query(Transaction).filter(Transaction.id == txn_id).first()
+    txn = (
+        db.query(Transaction)
+        .filter(Transaction.id == txn_id, Transaction.user_id == current_user.id)
+        .first()
+    )
     if not txn:
         raise HTTPException(status_code=404, detail="账单不存在")
     db.delete(txn)

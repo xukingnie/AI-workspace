@@ -2,30 +2,32 @@
   <div class="home-page">
     <van-nav-bar title="首页" />
 
-    <div class="calendar-card">
-      <van-calendar
-        :model-value="selectedDate"
-        :min-date="calendarMinDate"
-        :max-date="calendarMaxDate"
-        :default-date="calendarDefaultDate"
-        :show-confirm="false"
-        :show-title="false"
-        :show-subtitle="false"
-        :poppable="false"
-        :allow-same-day="true"
-        @select="onDateSelect"
-      >
-        <template #bottom-info="{ date }">
-          <div v-if="getDaySummary(date)" class="calendar-mark">
-            <span v-if="getDaySummary(date)!.income > 0" class="mark-income">
-              {{ formatShort(getDaySummary(date)!.income) }}
-            </span>
-            <span v-if="getDaySummary(date)!.expense > 0" class="mark-expense">
-              {{ formatShort(getDaySummary(date)!.expense) }}
-            </span>
-          </div>
-        </template>
-      </van-calendar>
+    <div class="overview-card">
+      <div class="month-selector">
+        <van-icon name="arrow-left" @click="prevMonth" />
+        <span class="month-text">{{ year }}年{{ month }}月</span>
+        <van-icon name="arrow" @click="nextMonth" />
+      </div>
+      <div class="overview-numbers">
+        <div class="num-item clickable" @click="goToStats('income')">
+          <span class="label">收入</span>
+          <span class="value income">
+            {{ formatMoney(statsStore.overview?.total_income) }}
+          </span>
+        </div>
+        <div class="num-item clickable" @click="goToStats('expense')">
+          <span class="label">支出</span>
+          <span class="value expense">
+            {{ formatMoney(statsStore.overview?.total_expense) }}
+          </span>
+        </div>
+        <div class="num-item clickable" @click="goToStats('balance')">
+          <span class="label">结余</span>
+          <span class="value" :class="balanceClass">
+            {{ formatMoney(statsStore.overview?.balance) }}
+          </span>
+        </div>
+      </div>
     </div>
 
     <div class="hero-head">
@@ -53,35 +55,14 @@ import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
 import { useNavigationStore } from '@/stores/navigation'
 import { useStatisticsStore } from '@/stores/statistics'
-import type { DailyStat } from '@/types'
 
 const router = useRouter()
 const navStore = useNavigationStore()
 const statsStore = useStatisticsStore()
 
 const now = dayjs()
-const selectedDate = ref(now.format('YYYY-MM-DD'))
-
-const calendarYear = ref(now.year())
-const calendarMonth = ref(now.month() + 1)
-
-const calendarMinDate = computed(() => {
-  const d = dayjs(`${calendarYear.value}-${String(calendarMonth.value).padStart(2, '0')}-01`)
-  return d.toDate()
-})
-
-const calendarMaxDate = computed(() => {
-  const d = dayjs(`${calendarYear.value}-${String(calendarMonth.value).padStart(2, '0')}-01`).endOf(
-    'month',
-  )
-  return d.toDate()
-})
-
-const calendarDefaultDate = computed(() =>
-  dayjs(`${calendarYear.value}-${String(calendarMonth.value).padStart(2, '0')}-01`).toDate(),
-)
-
-const dailyMap = ref<Record<string, DailyStat>>({})
+const year = ref(now.year())
+const month = ref(now.month() + 1)
 
 type HomeRouteName = 'countdown' | 'stats' | 'add' | 'settings'
 
@@ -94,18 +75,18 @@ const cards = computed(() => [
     visible: navStore.homeCardVisible.countdown,
   },
   {
-    name: 'stats' as const,
-    title: '统计',
-    desc: '收支分析视图',
-    className: 'card-stats',
-    visible: navStore.homeCardVisible.stats,
-  },
-  {
     name: 'add' as const,
     title: '记账',
     desc: '快速新增账单',
     className: 'card-add',
     visible: navStore.homeCardVisible.add,
+  },
+  {
+    name: 'stats' as const,
+    title: '统计',
+    desc: '收支分析视图',
+    className: 'card-stats',
+    visible: navStore.homeCardVisible.stats,
   },
   {
     name: 'settings' as const,
@@ -122,32 +103,51 @@ function goTo(name: HomeRouteName) {
   router.push({ name })
 }
 
-async function loadCalendarData() {
-  await statsStore.fetchDaily(calendarYear.value, calendarMonth.value)
-  const map: Record<string, DailyStat> = {}
-  for (const stat of statsStore.dailyStats) {
-    map[stat.date] = stat
+function prevMonth() {
+  if (month.value === 1) {
+    year.value--
+    month.value = 12
+  } else {
+    month.value--
   }
-  dailyMap.value = map
+  statsStore.fetchOverview(year.value, month.value)
 }
 
-function getDaySummary(date: Date) {
-  const key = dayjs(date).format('YYYY-MM-DD')
-  return dailyMap.value[key] || null
+function nextMonth() {
+  if (month.value === 12) {
+    year.value++
+    month.value = 1
+  } else {
+    month.value++
+  }
+  statsStore.fetchOverview(year.value, month.value)
 }
 
-function onDateSelect(date: Date) {
-  selectedDate.value = dayjs(date).format('YYYY-MM-DD')
+function goToStats(type: 'income' | 'expense' | 'balance') {
+  router.push({
+    name: 'stats',
+    query: {
+      type,
+      year: String(year.value),
+      month: String(month.value),
+    },
+  })
 }
+
+const balanceClass = computed(() => {
+  const bal = statsStore.overview?.balance ?? 0
+  if (bal > 0) return 'positive'
+  if (bal < 0) return 'negative'
+  return ''
+})
 
 async function loadData() {
-  await loadCalendarData()
+  await statsStore.fetchOverview(year.value, month.value)
 }
 
-function formatShort(val: number) {
-  if (val >= 10000) return (val / 10000).toFixed(1) + 'w'
-  if (val >= 1000) return (val / 1000).toFixed(1) + 'k'
-  return String(Math.round(val))
+function formatMoney(val?: number) {
+  if (val == null) return '0.00'
+  return Number(val).toFixed(2)
 }
 
 onMounted(loadData)
@@ -159,26 +159,66 @@ onMounted(loadData)
   padding: 14px;
   padding-bottom: 72px;
 
-  .calendar-card {
-    background: white;
+  .overview-card {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 16px;
     margin: 0 0 12px;
     border-radius: 12px;
-    overflow: hidden;
   }
 
-  .calendar-mark {
+  .month-selector {
     display: flex;
-    gap: 2px;
-    font-size: 10px;
-    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 12px;
   }
 
-  .mark-income {
-    color: #07c160;
+  .month-text {
+    font-size: 18px;
+    font-weight: bold;
   }
 
-  .mark-expense {
-    color: #ee0a24;
+  .overview-numbers {
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .num-item {
+    text-align: center;
+  }
+
+  .num-item.clickable {
+    cursor: pointer;
+  }
+
+  .num-item .label {
+    font-size: 12px;
+    opacity: 0.8;
+  }
+
+  .num-item .value {
+    display: block;
+    font-size: 20px;
+    font-weight: bold;
+    margin-top: 4px;
+  }
+
+  .num-item .value.income {
+    color: #a8f0a8;
+  }
+
+  .num-item .value.expense {
+    color: #ffb3b3;
+  }
+
+  .num-item .value.positive {
+    color: #a8f0a8;
+  }
+
+  .num-item .value.negative {
+    color: #ffb3b3;
   }
 
   .hero-head {

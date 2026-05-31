@@ -3,25 +3,34 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Category
+from dependencies import get_current_user
+from models import Category, User
 from schemas import CategoryCreate, CategoryUpdate, CategoryOut
 
 router = APIRouter(prefix="/api/categories", tags=["分类"])
 
 
 @router.get("", response_model=list[CategoryOut])
-def list_categories(type: str | None = None, db: Session = Depends(get_db)):
+def list_categories(
+    type: str | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """获取分类列表，可按类型筛选"""
-    q = db.query(Category)
+    q = db.query(Category).filter(Category.user_id == current_user.id)
     if type:
         q = q.filter(Category.type == type)
     return q.order_by(Category.sort_order).all()
 
 
 @router.post("", response_model=CategoryOut)
-def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
+def create_category(
+    data: CategoryCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """新增分类"""
-    cat = Category(**data.model_dump())
+    cat = Category(user_id=current_user.id, **data.model_dump())
     db.add(cat)
     db.commit()
     db.refresh(cat)
@@ -29,9 +38,18 @@ def create_category(data: CategoryCreate, db: Session = Depends(get_db)):
 
 
 @router.put("/{cat_id}", response_model=CategoryOut)
-def update_category(cat_id: int, data: CategoryUpdate, db: Session = Depends(get_db)):
+def update_category(
+    cat_id: int,
+    data: CategoryUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """编辑分类"""
-    cat = db.query(Category).filter(Category.id == cat_id).first()
+    cat = (
+        db.query(Category)
+        .filter(Category.id == cat_id, Category.user_id == current_user.id)
+        .first()
+    )
     if not cat:
         raise HTTPException(status_code=404, detail="分类不存在")
     for key, val in data.model_dump(exclude_unset=True).items():
@@ -42,9 +60,17 @@ def update_category(cat_id: int, data: CategoryUpdate, db: Session = Depends(get
 
 
 @router.delete("/{cat_id}")
-def delete_category(cat_id: int, db: Session = Depends(get_db)):
+def delete_category(
+    cat_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """删除分类"""
-    cat = db.query(Category).filter(Category.id == cat_id).first()
+    cat = (
+        db.query(Category)
+        .filter(Category.id == cat_id, Category.user_id == current_user.id)
+        .first()
+    )
     if not cat:
         raise HTTPException(status_code=404, detail="分类不存在")
     db.delete(cat)
