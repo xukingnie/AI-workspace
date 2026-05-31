@@ -42,3 +42,7 @@ export const CATEGORY_ICON_MAP: Record<string, string> = {
 export function getCategoryIcon(icon: string): string {
   return CATEGORY_ICON_MAP[icon] || '📌'
 }
+
+export function getDefaultCategoryIcon(type: 'income' | 'expense'): string {
+  return type === 'income' ? 'other-income' : 'other-expense'
+}
