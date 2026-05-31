@@ -11,11 +11,11 @@
 
     <!-- 概览卡片 -->
     <div class="overview-row">
-      <div class="stat-card income-bg" @click="onTabChange(1)">
+      <div class="stat-card income-bg" @click="selectTab('income')">
         <span class="label">收入</span>
         <span class="value">{{ formatMoney(statsStore.overview?.total_income) }}</span>
       </div>
-      <div class="stat-card expense-bg" @click="onTabChange(0)">
+      <div class="stat-card expense-bg" @click="selectTab('expense')">
         <span class="label">支出</span>
         <span class="value">{{ formatMoney(statsStore.overview?.total_expense) }}</span>
       </div>
@@ -30,37 +30,25 @@
     <!-- 分类统计 -->
     <div class="chart-section">
       <van-tabs v-model:active="activeTab" @change="onTabChange">
-        <van-tab title="支出分类">
+        <van-tab v-for="tab in statTabs" :key="tab.type" :title="tab.title">
           <div class="chart-wrap">
-            <div v-if="expenseStats.length === 0" class="empty">暂无数据</div>
+            <div v-if="getStats(tab.type).length === 0" class="empty">暂无数据</div>
             <div v-else class="category-list">
-              <div v-for="item in expenseStats" :key="item.category_id" class="category-stat-item">
+              <div
+                v-for="item in getStats(tab.type)"
+                :key="item.category_id"
+                class="category-stat-item"
+              >
                 <div class="category-meta">
                   <span class="category-icon">{{ getCategoryEmoji(item.category_icon) }}</span>
                   <span class="name">{{ item.category_name }}</span>
                 </div>
                 <div class="bar-wrap">
-                  <div class="bar"
-                    :style="{ width: item.percentage + '%', backgroundColor: getBarColor(item.percentage) }" />
-                </div>
-                <span class="stat-value">
-                  {{ formatMoney(item.total) }}（{{ item.percentage }}%）
-                </span>
-              </div>
-            </div>
-          </div>
-        </van-tab>
-        <van-tab title="收入分类">
-          <div class="chart-wrap">
-            <div v-if="incomeStats.length === 0" class="empty">暂无数据</div>
-            <div v-else class="category-list">
-              <div v-for="item in incomeStats" :key="item.category_id" class="category-stat-item">
-                <div class="category-meta">
-                  <span class="category-icon">{{ getCategoryEmoji(item.category_icon) }}</span>
-                  <span class="name">{{ item.category_name }}</span>
-                </div>
-                <div class="bar-wrap">
-                  <div class="bar income-bar" :style="{ width: item.percentage + '%' }" />
+                  <div
+                    class="bar"
+                    :class="{ 'income-bar': tab.type === 'income' }"
+                    :style="getBarStyle(tab.type, item.percentage)"
+                  />
                 </div>
                 <span class="stat-value">
                   {{ formatMoney(item.total) }}（{{ item.percentage }}%）
@@ -76,9 +64,7 @@
       <div class="section-header">
         <div>
           <div class="section-title">本月备注</div>
-          <div class="section-subtitle">
-            {{ activeTab === 0 ? '支出' : '收入' }}中已填写备注的记录
-          </div>
+          <div class="section-subtitle">{{ activeTypeLabel }}中已填写备注的记录</div>
         </div>
         <span class="note-count">{{ filteredNotes.length }}条</span>
       </div>
@@ -89,7 +75,9 @@
         <div v-for="item in filteredNotes" :key="item.id" class="note-item">
           <div class="note-top">
             <div class="note-category">
-              <span class="category-icon note-icon">{{ getCategoryEmoji(item.category?.icon) }}</span>
+              <span class="category-icon note-icon">{{
+                getCategoryEmoji(item.category?.icon)
+              }}</span>
               <span>{{ item.category?.name || '未分类' }}</span>
             </div>
             <span class="note-amount" :class="item.type">
@@ -105,7 +93,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import dayjs from 'dayjs'
 import { useRoute } from 'vue-router'
 import { useStatisticsStore } from '@/stores/statistics'
@@ -113,30 +101,45 @@ import { useTransactionStore } from '@/stores/transaction'
 import { getCategoryIcon } from '@/options/categories'
 import type { CategoryStat, Transaction } from '@/types'
 
+type StatisticsType = Transaction['type']
+
 const statsStore = useStatisticsStore()
 const transactionStore = useTransactionStore()
 const route = useRoute()
 
+const statTabs = [
+  { title: '收入分类', type: 'income' as const },
+  { title: '支出分类', type: 'expense' as const },
+]
 const now = dayjs()
 const year = ref(now.year())
 const month = ref(now.month() + 1)
 const activeTab = ref(0)
-const expenseStats = ref<CategoryStat[]>([])
-const incomeStats = ref<CategoryStat[]>([])
+const statsByType = ref<Record<StatisticsType, CategoryStat[]>>({
+  income: [],
+  expense: [],
+})
+
+const activeType = computed<StatisticsType>(() => statTabs[activeTab.value]?.type ?? 'income')
+const activeTypeLabel = computed(() => (activeType.value === 'income' ? '收入' : '支出'))
 
 function toNumber(value: unknown) {
   const num = Number(value)
   return Number.isFinite(num) ? num : null
 }
 
-function applyRouteQuery() {
-  const type = route.query.type
-  if (type === 'expense') {
-    activeTab.value = 0
-  } else if (type === 'income') {
-    activeTab.value = 1
-  } else if (type === 'balance') {
-    activeTab.value = 2
+function resolveRouteType(value: unknown): StatisticsType | null {
+  if (value === 'income' || value === 'expense') {
+    return value
+  }
+
+  return null
+}
+
+function syncRouteState() {
+  const routeType = resolveRouteType(route.query.type)
+  if (routeType) {
+    activeTab.value = statTabs.findIndex((tab) => tab.type === routeType)
   }
 
   const queryYear = toNumber(route.query.year)
@@ -148,44 +151,51 @@ function applyRouteQuery() {
 }
 
 const filteredNotes = computed(() => {
-  const currentType = activeTab.value === 0 ? 'expense' : activeTab.value === 1 ? 'income' : 'balance'
-
   return transactionStore.transactions.filter(
-    (item) => item.type === currentType && item.note?.trim(),
+    (item) => item.type === activeType.value && item.note?.trim(),
   )
 })
 
-function prevMonth() {
-  if (month.value === 1) {
-    year.value--
-    month.value = 12
-  } else {
-    month.value--
+async function changeMonth(offset: number) {
+  const nextMonth = dayjs(`${year.value}-${String(month.value).padStart(2, '0')}-01`).add(
+    offset,
+    'month',
+  )
+
+  year.value = nextMonth.year()
+  month.value = nextMonth.month() + 1
+  await loadData()
+}
+
+async function prevMonth() {
+  await changeMonth(-1)
+}
+
+async function nextMonth() {
+  await changeMonth(1)
+}
+
+async function selectTab(type: StatisticsType) {
+  const nextTab = statTabs.findIndex((tab) => tab.type === type)
+  if (nextTab === activeTab.value) {
+    await loadCategoryStats(type)
+    return
   }
-  loadData()
+
+  activeTab.value = nextTab
 }
 
-function nextMonth() {
-  if (month.value === 12) {
-    year.value++
-    month.value = 1
-  } else {
-    month.value++
-  }
-  loadData()
+async function onTabChange(index: number) {
+  activeTab.value = Number(index)
+  await loadCategoryStats()
 }
 
-function onTabChange(index: number) {
-  activeTab.value = index
-  loadCategoryStats()
-}
-
-async function loadData() {
+async function loadData(type = activeType.value) {
   await Promise.all([
     statsStore.fetchOverview(year.value, month.value),
     loadTransactions(),
+    loadCategoryStats(type),
   ])
-  loadCategoryStats()
 }
 
 async function loadTransactions() {
@@ -196,20 +206,26 @@ async function loadTransactions() {
   })
 }
 
-async function loadCategoryStats() {
-  if (activeTab.value === 0) {
-    await statsStore.fetchByCategory(year.value, month.value, 'expense')
-    expenseStats.value = [...statsStore.categoryStats]
-  } else {
-    await statsStore.fetchByCategory(year.value, month.value, 'income')
-    incomeStats.value = [...statsStore.categoryStats]
-  }
+async function loadCategoryStats(type = activeType.value) {
+  await statsStore.fetchByCategory(year.value, month.value, type)
+  statsByType.value[type] = [...statsStore.categoryStats]
+}
+
+function getStats(type: StatisticsType) {
+  return statsByType.value[type] ?? []
 }
 
 function getBarColor(pct: number) {
   if (pct > 50) return '#ee0a24'
   if (pct > 20) return '#ff976a'
   return '#f5a623'
+}
+
+function getBarStyle(type: StatisticsType, pct: number) {
+  return {
+    width: `${pct}%`,
+    ...(type === 'expense' ? { backgroundColor: getBarColor(pct) } : {}),
+  }
 }
 
 function getCategoryEmoji(icon?: string) {
@@ -228,15 +244,11 @@ function formatDate(val: Transaction['transaction_date']) {
 watch(
   () => [route.query.type, route.query.year, route.query.month],
   async () => {
-    applyRouteQuery()
+    syncRouteState()
     await loadData()
   },
+  { immediate: true },
 )
-
-onMounted(async () => {
-  applyRouteQuery()
-  await loadData()
-})
 </script>
 
 <style scoped>

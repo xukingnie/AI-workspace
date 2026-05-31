@@ -626,7 +626,7 @@ watch([selectedCategoryId, recordType], () => {
   background: white;
   border-radius: 14px;
   padding: 12px;
-  margin-top: 10px;
+  margin: 10px 0;
 }
 
 .category-section__head {

@@ -33,7 +33,7 @@
     <div class="countdown-card">
       <div class="countdown-header">
         <span>距发薪日</span>
-        <van-icon name="setting-o" @click="showPaydayPicker = true" />
+        <van-icon name="setting-o" @click="openPayrollSettings" />
       </div>
       <div class="countdown-days">
         <span class="days">{{ countdownDays }}</span>
@@ -43,6 +43,7 @@
         <span>发薪日：每月{{ payday }}日</span>
         <span v-if="nextPayday">（{{ nextPayday }}）</span>
       </div>
+      <div class="countdown-salary">工资金额：{{ formatMoney(salaryAmount) }}</div>
     </div>
 
     <!-- 日历 Wrapper -->
@@ -71,17 +72,6 @@
         </template>
       </van-calendar>
     </div>
-
-    <!-- 调薪日选择器 -->
-    <van-popup v-model:show="showPaydayPicker" position="bottom" round>
-      <van-picker
-        :columns="dayColumns"
-        :default-index="payday - 1"
-        title="选择发薪日"
-        @confirm="onPaydayConfirm"
-        @cancel="showPaydayPicker = false"
-      />
-    </van-popup>
   </div>
 </template>
 
@@ -90,9 +80,15 @@ import { ref, computed, onMounted } from 'vue'
 import dayjs from 'dayjs'
 import { useRouter } from 'vue-router'
 import { useStatisticsStore } from '@/stores/statistics'
+import { useCategoryStore } from '@/stores/category'
+import { useTransactionStore } from '@/stores/transaction'
+import { usePayrollStore } from '@/stores/payroll'
 import type { DailyStat } from '@/types'
 
 const statsStore = useStatisticsStore()
+const categoryStore = useCategoryStore()
+const transactionStore = useTransactionStore()
+const payrollStore = usePayrollStore()
 const router = useRouter()
 
 const now = dayjs()
@@ -178,12 +174,8 @@ const balanceClass = computed(() => {
   return ''
 })
 
-const payday = ref(15)
-const showPaydayPicker = ref(false)
-const dayColumns = Array.from({ length: 28 }, (_, i) => ({
-  text: `${i + 1} 日`,
-  value: i + 1,
-}))
+const payday = computed(() => payrollStore.payday)
+const salaryAmount = computed(() => payrollStore.salaryAmount)
 
 const countdownDays = computed(() => {
   const today = dayjs()
@@ -203,9 +195,11 @@ const nextPayday = computed(() => {
   return target.format('MM月DD日')
 })
 
-function onPaydayConfirm({ selectedOptions }: any) {
-  payday.value = selectedOptions[0].value
-  showPaydayPicker.value = false
+function openPayrollSettings() {
+  router.push({
+    name: 'settings-drawer',
+    query: { returnTo: 'countdown' },
+  })
 }
 
 const dailyMap = ref<Record<string, DailyStat>>({})
@@ -220,7 +214,52 @@ function onDateSelect(date: Date) {
 }
 
 async function loadData() {
+  await ensureSalaryTransaction()
   await Promise.all([statsStore.fetchOverview(year.value, month.value), loadCalendarData()])
+}
+
+async function ensureSalaryTransaction() {
+  if (salaryAmount.value <= 0) return
+
+  await categoryStore.fetchCategories()
+
+  const salaryCategory =
+    categoryStore.categories.find((item) => item.type === 'income' && item.name === '工资') ??
+    categoryStore.categories.find((item) => item.type === 'income')
+
+  if (!salaryCategory) return
+
+  const today = dayjs()
+  const paydayDate = dayjs(
+    `${today.year()}-${String(today.month() + 1).padStart(2, '0')}-${String(payday.value).padStart(2, '0')}`,
+  )
+  if (today.isBefore(paydayDate, 'day')) return
+
+  const salaryDate = paydayDate.format('YYYY-MM-DD')
+  await transactionStore.fetchTransactions({
+    type: 'income',
+    category_id: salaryCategory.id,
+    start_date: salaryDate,
+    end_date: salaryDate,
+    page_size: 100,
+  })
+
+  const exists = transactionStore.transactions.some(
+    (item) =>
+      item.type === 'income' &&
+      item.category_id === salaryCategory.id &&
+      item.transaction_date === salaryDate,
+  )
+
+  if (exists) return
+
+  await transactionStore.addTransaction({
+    amount: salaryAmount.value,
+    type: 'income',
+    category_id: salaryCategory.id,
+    transaction_date: salaryDate,
+    note: '工资',
+  })
 }
 
 function formatMoney(val?: number) {
@@ -341,6 +380,12 @@ onMounted(loadData)
 .countdown-date {
   font-size: 13px;
   color: #999;
+}
+
+.countdown-salary {
+  margin-top: 8px;
+  font-size: 13px;
+  color: #666;
 }
 
 .calendar-card {

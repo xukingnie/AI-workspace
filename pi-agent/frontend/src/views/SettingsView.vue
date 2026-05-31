@@ -374,7 +374,10 @@ function onTouchDragCancel() {
 }
 
 function openDrawerSettings() {
-  router.push({ name: 'settings-drawer' })
+  router.push({
+    name: 'settings-drawer',
+    query: { returnTo: 'settings' },
+  })
 }
 
 // ========== 导出相关 ==========
