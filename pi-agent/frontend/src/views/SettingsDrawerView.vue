@@ -4,11 +4,18 @@
       v-model:show="showDrawer"
       position="right"
       :style="{ width: '86%', height: '100%' }"
-      closeable
+      :closeable="false"
       @closed="handleClosed"
     >
       <div class="drawer-body">
-        <van-nav-bar title="高级设置" left-arrow @click-left="closeDrawer" />
+        <van-nav-bar title="高级设置" @click-left="goToHome">
+          <template #left>
+            <van-icon name="home-o" size="18" @click="goToHome" />
+          </template>
+          <template #right>
+            <van-icon name="cross" size="18" @click="closeDrawer" />
+          </template>
+        </van-nav-bar>
 
         <div class="drawer-content">
           <h3 class="drawer-title">工资设置</h3>
@@ -75,8 +82,17 @@ function closeDrawer() {
 }
 
 function handleClosed() {
-  const returnTo = route.query.returnTo === 'countdown' ? 'countdown' : 'settings'
+  const returnTo =
+    route.query.returnTo === 'home'
+      ? 'home'
+      : route.query.returnTo === 'countdown'
+        ? 'countdown'
+        : 'settings'
   router.replace({ name: returnTo })
+}
+
+function goToHome() {
+  router.replace({ name: 'home' })
 }
 
 function handleResetConfig() {

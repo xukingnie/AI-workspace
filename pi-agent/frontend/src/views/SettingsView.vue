@@ -1,6 +1,9 @@
 <template>
   <div class="settings-page">
     <van-nav-bar title="设置">
+      <template #left>
+        <van-icon name="home-o" size="18" @click="goToHome" />
+      </template>
       <template #right>
         <van-icon name="setting-o" size="18" @click="openDrawerSettings" />
       </template>
@@ -47,6 +50,13 @@
                   size="20"
                   @update:model-value="(value: boolean) => onToggleTab(item.key, value)"
                 />
+              </div>
+              <div class="sort-item sort-item--fixed">
+                <span class="drag-placeholder">
+                  <van-icon name="setting-o" class="drag-icon" />
+                </span>
+                <span class="sort-name">设置</span>
+                <span class="sort-path">/settings</span>
               </div>
             </div>
           </template>
@@ -230,13 +240,20 @@ const categoryGroups = computed(() => [
 
 function onToggleTab(key: NavTabKey, visible: boolean) {
   if (!visible) {
-    const visibleCount = sortableTabs.value.filter((item) => item.visible).length
-    if (visibleCount <= 1) {
+    if (navStore.getVisibleHomeCardCount() <= 1) {
       showToast('至少保留一个可见页面')
       return
     }
   }
   navStore.setTabVisible(key, visible)
+}
+
+function onToggleSettingsCard(visible: boolean) {
+  if (!visible && navStore.getVisibleHomeCardCount() <= 1) {
+    showToast('至少保留一个可见页面')
+    return
+  }
+  navStore.setHomeCardVisible('settings', visible)
 }
 
 // #region 导航配置拖拽相关
@@ -378,6 +395,10 @@ function openDrawerSettings() {
     name: 'settings-drawer',
     query: { returnTo: 'settings' },
   })
+}
+
+function goToHome() {
+  router.push({ name: 'home' })
 }
 
 // ========== 导出相关 ==========
@@ -620,6 +641,17 @@ onBeforeUnmount(() => {
     background-color 0.2s ease,
     box-shadow 0.2s ease,
     transform 0.2s ease;
+}
+
+.sort-item--fixed {
+  cursor: default;
+}
+
+.drag-placeholder {
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .drag-handle {

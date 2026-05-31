@@ -1,5 +1,11 @@
 <template>
   <div class="countdown-page">
+    <van-nav-bar title="倒计时">
+      <template #left>
+        <van-icon name="home-o" size="18" @click="goToHome" />
+      </template>
+    </van-nav-bar>
+
     <!-- 月度概览卡片 -->
     <div class="overview-card">
       <div class="month-selector">
@@ -200,6 +206,10 @@ function openPayrollSettings() {
     name: 'settings-drawer',
     query: { returnTo: 'countdown' },
   })
+}
+
+function goToHome() {
+  router.push({ name: 'home' })
 }
 
 const dailyMap = ref<Record<string, DailyStat>>({})

@@ -1,8 +1,11 @@
+/** 金额种类 */
+export type AmountType = 'income' | 'expense'
+
 /** 分类 */
 export interface Category {
   id: number
   name: string
-  type: 'income' | 'expense'
+  type: AmountType
   icon: string
   sort_order: number
 }
@@ -11,7 +14,7 @@ export interface Category {
 export interface Transaction {
   id: number
   amount: number
-  type: 'income' | 'expense'
+  type: AmountType
   category_id: number
   transaction_date: string
   note: string

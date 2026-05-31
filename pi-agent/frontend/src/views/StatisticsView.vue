@@ -1,6 +1,10 @@
 <template>
   <div class="stats-page">
-    <van-nav-bar title="统计" />
+    <van-nav-bar title="统计">
+      <template #left>
+        <van-icon name="home-o" size="18" @click="goToHome" />
+      </template>
+    </van-nav-bar>
 
     <!-- 月份选择 -->
     <div class="month-bar">
@@ -95,7 +99,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import dayjs from 'dayjs'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useStatisticsStore } from '@/stores/statistics'
 import { useTransactionStore } from '@/stores/transaction'
 import { getCategoryIcon } from '@/options/categories'
@@ -106,6 +110,7 @@ type StatisticsType = Transaction['type']
 const statsStore = useStatisticsStore()
 const transactionStore = useTransactionStore()
 const route = useRoute()
+const router = useRouter()
 
 const statTabs = [
   { title: '收入分类', type: 'income' as const },
@@ -122,6 +127,10 @@ const statsByType = ref<Record<StatisticsType, CategoryStat[]>>({
 
 const activeType = computed<StatisticsType>(() => statTabs[activeTab.value]?.type ?? 'income')
 const activeTypeLabel = computed(() => (activeType.value === 'income' ? '收入' : '支出'))
+
+function goToHome() {
+  router.push({ name: 'home' })
+}
 
 function toNumber(value: unknown) {
   const num = Number(value)

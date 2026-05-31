@@ -5,7 +5,12 @@ const router = createRouter({
   routes: [
     {
       path: '/',
-      redirect: '/countdown',
+      redirect: '/home',
+    },
+    {
+      path: '/home',
+      name: 'home',
+      component: () => import('@/views/HomeView.vue'),
     },
     {
       path: '/countdown',

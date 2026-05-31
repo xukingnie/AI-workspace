@@ -2,10 +2,12 @@ import { computed, ref } from 'vue'
 import { defineStore } from 'pinia'
 
 export type NavTabKey = 'countdown' | 'stats' | 'add'
+export type HomeCardKey = NavTabKey | 'settings'
 
 interface NavigationConfig {
   tabOrder: NavTabKey[]
   visibleTabs: Record<NavTabKey, boolean>
+  homeCardVisible: Record<HomeCardKey, boolean>
 }
 
 const STORAGE_KEY = 'pi-agent-navigation-config'
@@ -17,6 +19,12 @@ const STATIC_DEFAULT_CONFIG: NavigationConfig = {
     countdown: true,
     stats: true,
     add: true,
+  },
+  homeCardVisible: {
+    countdown: true,
+    stats: true,
+    add: true,
+    settings: true,
   },
 }
 
@@ -60,6 +68,27 @@ function normalizeVisibleTabs(visibleTabs?: unknown): Record<NavTabKey, boolean>
   }
 }
 
+function normalizeHomeCardVisible(
+  homeCardVisible: unknown,
+  normalizedVisibleTabs: Record<NavTabKey, boolean>,
+): Record<HomeCardKey, boolean> {
+  const source =
+    typeof homeCardVisible === 'object' && homeCardVisible
+      ? (homeCardVisible as Partial<Record<HomeCardKey, unknown>>)
+      : {}
+
+  return {
+    countdown:
+      typeof source.countdown === 'boolean' ? source.countdown : normalizedVisibleTabs.countdown,
+    stats: typeof source.stats === 'boolean' ? source.stats : normalizedVisibleTabs.stats,
+    add: typeof source.add === 'boolean' ? source.add : normalizedVisibleTabs.add,
+    settings:
+      typeof source.settings === 'boolean'
+        ? source.settings
+        : STATIC_DEFAULT_CONFIG.homeCardVisible.settings,
+  }
+}
+
 function migrateLegacyConfig(parsed: Record<string, unknown>): NavigationConfig | null {
   const hasLegacy = 'showAdd' in parsed || 'showStats' in parsed || 'middleOrder' in parsed
   if (!hasLegacy) return null
@@ -76,6 +105,12 @@ function migrateLegacyConfig(parsed: Record<string, unknown>): NavigationConfig 
       add: showAdd,
       stats: showStats,
     },
+    homeCardVisible: {
+      countdown: true,
+      add: showAdd,
+      stats: showStats,
+      settings: true,
+    },
   }
 }
 
@@ -91,10 +126,15 @@ function parseNavigationConfig(raw: string | null): NavigationConfig | null {
 
     const normalizedOrder = normalizeTabOrder(parsed.tabOrder)
     const normalizedVisibleTabs = normalizeVisibleTabs(parsed.visibleTabs)
+    const normalizedHomeCardVisible = normalizeHomeCardVisible(
+      parsed.homeCardVisible,
+      normalizedVisibleTabs,
+    )
 
     return {
       tabOrder: normalizedOrder,
       visibleTabs: normalizedVisibleTabs,
+      homeCardVisible: normalizedHomeCardVisible,
     }
   } catch {
     return null
@@ -108,6 +148,7 @@ function loadDefaultConfig(): NavigationConfig {
   return {
     tabOrder: [...STATIC_DEFAULT_CONFIG.tabOrder],
     visibleTabs: { ...STATIC_DEFAULT_CONFIG.visibleTabs },
+    homeCardVisible: { ...STATIC_DEFAULT_CONFIG.homeCardVisible },
   }
 }
 
@@ -115,6 +156,7 @@ function saveDefaultConfig(config: NavigationConfig) {
   const data: NavigationConfig = {
     tabOrder: [...config.tabOrder],
     visibleTabs: { ...config.visibleTabs },
+    homeCardVisible: { ...config.homeCardVisible },
   }
   localStorage.setItem(DEFAULT_STORAGE_KEY, JSON.stringify(data))
 }
@@ -130,6 +172,7 @@ export const useNavigationStore = defineStore('navigation', () => {
   const defaultConfig = loadDefaultConfig()
   const tabOrder = ref<NavTabKey[]>([...defaultConfig.tabOrder])
   const visibleTabs = ref<Record<NavTabKey, boolean>>({ ...defaultConfig.visibleTabs })
+  const homeCardVisible = ref<Record<HomeCardKey, boolean>>({ ...defaultConfig.homeCardVisible })
 
   if (!localStorage.getItem(DEFAULT_STORAGE_KEY)) {
     const currentConfig = parseNavigationConfig(localStorage.getItem(STORAGE_KEY)) ?? defaultConfig
@@ -140,6 +183,7 @@ export const useNavigationStore = defineStore('navigation', () => {
     const data: NavigationConfig = {
       tabOrder: [...tabOrder.value],
       visibleTabs: { ...visibleTabs.value },
+      homeCardVisible: { ...homeCardVisible.value },
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
   }
@@ -149,7 +193,28 @@ export const useNavigationStore = defineStore('navigation', () => {
       ...visibleTabs.value,
       [key]: visible,
     }
+    homeCardVisible.value = {
+      ...homeCardVisible.value,
+      [key]: visible,
+    }
     persist()
+  }
+
+  function setHomeCardVisible(key: HomeCardKey, visible: boolean) {
+    if (key === 'settings') {
+      homeCardVisible.value = {
+        ...homeCardVisible.value,
+        settings: visible,
+      }
+      persist()
+      return
+    }
+
+    setTabVisible(key, visible)
+  }
+
+  function getVisibleHomeCardCount() {
+    return Object.values(homeCardVisible.value).filter(Boolean).length
   }
 
   function reorderTabs(fromKey: NavTabKey, toKey: NavTabKey) {
@@ -168,6 +233,7 @@ export const useNavigationStore = defineStore('navigation', () => {
     const targetDefault = loadDefaultConfig()
     tabOrder.value = [...targetDefault.tabOrder]
     visibleTabs.value = { ...targetDefault.visibleTabs }
+    homeCardVisible.value = { ...targetDefault.homeCardVisible }
     persist()
   }
 
@@ -175,12 +241,14 @@ export const useNavigationStore = defineStore('navigation', () => {
     const saved = loadConfig()
     tabOrder.value = [...saved.tabOrder]
     visibleTabs.value = { ...saved.visibleTabs }
+    homeCardVisible.value = { ...saved.homeCardVisible }
   }
 
   function getConfigObject(): NavigationConfig {
     return {
       tabOrder: [...tabOrder.value],
       visibleTabs: { ...visibleTabs.value },
+      homeCardVisible: { ...homeCardVisible.value },
     }
   }
 
@@ -206,9 +274,12 @@ export const useNavigationStore = defineStore('navigation', () => {
   return {
     tabOrder,
     visibleTabs,
+    homeCardVisible,
     configurableTabs,
     allTabs,
     setTabVisible,
+    setHomeCardVisible,
+    getVisibleHomeCardCount,
     reorderTabs,
     resetConfig,
     getConfigObject,

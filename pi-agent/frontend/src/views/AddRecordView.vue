@@ -1,6 +1,10 @@
 <template>
   <div class="add-page">
-    <van-nav-bar title="记账" />
+    <van-nav-bar title="记账">
+      <template #left>
+        <van-icon name="home-o" size="18" @click="goToHome" />
+      </template>
+    </van-nav-bar>
     <div class="form-wrap">
       <!-- 类型切换 -->
       <div class="type-switch">
@@ -168,11 +172,13 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import dayjs from 'dayjs'
 import { showToast, showConfirmDialog } from 'vant'
+import { useRouter } from 'vue-router'
 import { useCategoryStore } from '@/stores/category'
 import { useTransactionStore } from '@/stores/transaction'
 import { getCategoryIcon, getDefaultCategoryIcon } from '@/options/categories'
 import type { AmountSuggestion, NoteSuggestion } from '@/types'
 
+const router = useRouter()
 const categoryStore = useCategoryStore()
 const txnStore = useTransactionStore()
 
@@ -193,6 +199,10 @@ const categoryExpanded = ref(true)
 let suggestionRequestId = 0
 let amountSuggestionRequestId = 0
 let linkedAmountRequestId = 0
+
+function goToHome() {
+  router.push({ name: 'home' })
+}
 
 // 日期选择
 const showDatePicker = ref(false)
